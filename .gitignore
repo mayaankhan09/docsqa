@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+.env
+backend/data/raw/*
+backend/data/index/*
+frontend/node_modules/
+frontend/dist/
+
+# Keep empty data dirs tracked
+!backend/data/raw/.gitkeep
+!backend/data/index/.gitkeep
