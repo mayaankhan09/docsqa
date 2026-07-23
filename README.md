@@ -80,6 +80,7 @@ generalise.
   chunks. Accepted as a consequence of per-page chunking (see above).
 - **Scanned documents unsupported.** No OCR stage; the corpus was verified to
   be digitally generated text.
+  Table-structured content (benefit grids, plan comparison matrices) flattens into low-quality chunks during extraction and occasionally scores well on reranking despite carrying little meaning. Known limitation of linear PDF text extraction; table-aware parsing not in scope.
 
 ## Setup
 
