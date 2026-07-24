@@ -1,0 +1,14 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/data/raw:/app/data/raw
+      - model-cache:/models
+    restart: unless-stopped
+
+volumes:
+  model-cache:
