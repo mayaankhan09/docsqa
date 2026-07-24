@@ -1,0 +1,17 @@
+{"query": "What is the waiting period for pre-existing diseases?", "expected_insurers": ["Kotak General — Health Care"], "expected_pages": [4], "answer_contains": ["48 months"]}
+{"query": "How soon must pre-authorisation be requested for planned cashless hospitalisation?", "expected_insurers": ["Aditya Birla — Group Activ Health"], "expected_pages": [22], "answer_contains": ["48 hours"]}
+{"query": "How soon must emergency cashless hospitalisation be notified?", "expected_insurers": ["Aditya Birla — Group Activ Health"], "expected_pages": [22], "answer_contains": ["24 hours"]}
+{"query": "What happens if room rent exceeds the eligible limit?", "expected_insurers": ["Future Generali — Group Health"], "expected_pages": [23], "answer_contains": ["proportion"]}
+{"query": "What is the grace period for instalment premium payment?", "expected_insurers": ["Bajaj Allianz — Health Total", "Future Generali — Health Suraksha", "Future Generali — Group Health", "Kotak General — Health Care"], "expected_pages": [], "answer_contains": ["15 days"]}
+{"query": "What is the free look period?", "expected_insurers": ["SBI General — SuperHealth", "Kotak General — Health Care", "Bajaj Allianz — Health Total", "Future Generali — Health Suraksha"], "expected_pages": [], "answer_contains": ["15 days"]}
+{"query": "What is the maternity waiting period?", "expected_insurers": ["Care Health — Group Health", "United India — Group Health", "Future Generali — Group Health", "Future Generali — Health Suraksha"], "expected_pages": [], "answer_contains": ["9 months"]}
+{"query": "Is the sum insured restored after it is exhausted?", "expected_insurers": ["HDFC ERGO — Optima Restore", "Care Health — Group Health", "Future Generali — Health Suraksha"], "expected_pages": [], "answer_contains": ["100%"]}
+{"query": "How is the cumulative bonus calculated for a claim-free year?", "expected_insurers": ["Bajaj Allianz — Health Total"], "expected_pages": [], "answer_contains": ["50%"]}
+{"query": "What is the air ambulance cover limit?", "expected_insurers": ["Care Health — Group Health", "Future Generali — Group Health", "Future Generali — Health Suraksha"], "expected_pages": [], "answer_contains": ["2 Lac"]}
+{"query": "What is the pre-hospitalisation expense period?", "expected_insurers": ["United India — Group Health", "Kotak General — Health Care"], "expected_pages": [], "answer_contains": ["30 days"]}
+{"query": "What is the post-hospitalisation expense period?", "expected_insurers": ["United India — Group Health", "Kotak General — Health Care", "Care Health — Group Health"], "expected_pages": [], "answer_contains": ["60 days"]}
+{"query": "What is the sub-limit for cataract surgery?", "expected_insurers": ["Care Health — Group Health"], "expected_pages": [], "answer_contains": ["50,000"]}
+{"query": "What is the maximum duration for day-care treatment?", "expected_insurers": ["Care Health — Group Health"], "expected_pages": [], "answer_contains": ["24 hours"]}
+{"query": "Does the policy cover OPD treatment under day-care?", "expected_insurers": ["Care Health — Group Health", "SBI General — SuperHealth"], "expected_pages": [], "answer_contains": ["not"]}
+{"query": "What is the capital of France?", "expected_insurers": [], "expected_pages": [], "answer_contains": [], "expect_not_found": true}
+{"query": "Does this policy cover damage to my car?", "expected_insurers": [], "expected_pages": [], "answer_contains": [], "expect_not_found": true}
