@@ -1,124 +1,157 @@
-# DocsQA — RAG assistant for insurance policy documents
+# Evidex
 
-Answers natural-language questions about health insurance policy wordings and
-grounds every answer in the exact clause it came from, with insurer and page
-number. Built to make hallucination visible and verifiable: if the system
-cannot cite a source, it should not answer.
+**Ask health-insurance policies in plain language. Every answer cites the exact clause it came from.**
 
-Example: *"What is the waiting period for pre-existing diseases?"* returns the
-relevant clause from each insurer alongside a citation such as
-`SBI General — SuperHealth, p. 14`.
+Evidex is a retrieval-augmented question-answering system over health-insurance policy documents. Ask *"what is the waiting period for pre-existing diseases?"* and it returns a direct answer grounded in the specific clause, insurer, and page it came from — across nine insurers' policy wordings. If no relevant clause exists, it refuses rather than inventing an answer.
+
+The design premise: **an answer is only as trustworthy as the source behind it.** Every claim is traceable, and hallucination is controlled at three layers, not just the prompt.
+
+<p align="center">
+  <img src="D:\Users\STORAGE\Documents\docsqa\Screenshot 2026-07-25 114955.png" width="49%" alt="Evidex light mode" />
+  <img src="D:\Users\STORAGE\Documents\docsqa\Screenshot 2026-07-25 115307.png" width="49%" alt="Evidex dark mode" />
+</p>
+
+---
+
+## Why this is not a tutorial RAG project
+
+Most RAG demos stop at "it returns an answer." Evidex is measured, and the two things that most distinguish it — **cross-encoder reranking** and **evaluation** — are the two things tutorial projects skip.
+
+### Measured results
+
+Evaluated on 15 hand-labelled questions plus 2 out-of-scope refusals ([`backend/evals/`](backend/evals/)):
+
+| Metric | Result |
+|---|---|
+| Retrieval hit-rate @5 | **73%** |
+| Retrieval hit-rate @10 | **93%** |
+| Answer faithfulness | **87%** |
+| Refusal accuracy (out-of-scope) | **2 / 2** |
+
+The 20-point gap between hit-rate @5 and @10 is the most useful finding: correct clauses are being *retrieved* into the candidate pool but occasionally *ranked* outside the top 5. That localises the bottleneck to reranking rather than retrieval — a diagnosis only possible because retrieval and generation are measured separately.
+
+The two faithfulness "misses" were correct answers with numeric phrasing variance (spelled-out vs. numeral), which is a limitation of substring-based faithfulness scoring rather than a model error — noted honestly because knowing the difference matters.
+
+---
+
+## How it works
+
+```
+PDF policies → chunk → embed → FAISS index
+                                     │
+query ──► embed ──► retrieve top-20 ─┤
+                                     ▼
+                          cross-encoder rerank
+                                     │
+                            top-5 ───┤
+                                     ▼
+                       confidence gate (drop weak)
+                                     │
+                                     ▼
+                    LLM: answer using ONLY these,
+                         cite every claim
+                                     ▼
+                    validate citations, return
+```
+
+**Two-stage retrieval.** A bi-encoder (`all-MiniLM-L6-v2`) casts a wide, cheap net over all ~1,800 clauses and returns 20 candidates. A cross-encoder (`ms-marco-MiniLM-L-6-v2`) then re-scores just those 20 by reading the query and each clause *together*, and keeps the best 5. This recovers clauses the bi-encoder buries — in testing, a correct room-rent clause ranked 13th by vector search was promoted to 1st by reranking.
+
+**Three-layer hallucination control.**
+1. **Confidence gate** — clauses scoring below a cross-encoder threshold are dropped before the LLM sees them. If nothing clears the bar, the system refuses without an LLM call.
+2. **Grounded prompt** — the model is instructed to answer *only* from the numbered sources, cite every claim, and reply `NOT_FOUND` if the answer isn't present.
+3. **Citation validation** — citation markers in the answer are parsed and checked against the sources actually provided; fabricated citations are flagged.
+
+**Provider-agnostic generation.** The LLM sits behind a provider interface with an automatic fallback chain (`groq,gemini`). When one provider hits a rate limit, the chain falls through to the next with no downtime — a failure mode encountered and absorbed during development.
+
+---
 
 ## Stack
 
-| Layer | Choice | Why |
+| Layer | Choice | Rationale |
 |---|---|---|
-| Ingestion | pypdf + langchain-text-splitters | Fast, no external service |
-| Embeddings | `all-MiniLM-L6-v2` (local) | Zero API cost, runs offline |
-| Vector store | FAISS (local, persisted) | No hosted DB dependency |
-| Reranking | `ms-marco-MiniLM-L-6-v2` cross-encoder | Retrieval precision over raw recall |
-| Generation | Gemini, with Groq fallback | Provider-agnostic behind one interface |
-| API | FastAPI | Async, typed request/response models |
-| Frontend | React + Vite + Tailwind | *(planned)* |
-| Packaging | Docker | *(planned)* |
+| Ingestion | pypdf + langchain-text-splitters | Page-level chunking preserves exact citations |
+| Embeddings | `all-MiniLM-L6-v2` (local) | Zero API cost, offline, no rate limits during tuning |
+| Vector store | FAISS (`IndexFlatIP`) | Exact search; approximation unwarranted at this scale |
+| Reranking | `ms-marco-MiniLM-L-6-v2` cross-encoder | Precision over raw recall |
+| Generation | Groq / Gemini (fallback chain) | Free tiers; provider-agnostic by design |
+| API | FastAPI | Typed schemas, async, auto-generated docs |
+| Frontend | React + Vite | Light/dark, citation-to-source tracing |
+| Packaging | Docker + docker-compose | Reproducible deployment |
 
-Generation sits behind a provider interface, so the LLM vendor is a config
-value rather than a dependency baked into the retrieval code.
+---
 
 ## Corpus
 
-Nine health insurance policy wordings from nine Indian insurers, drawn from
-IRDAI's public repository of filed product documents
-(<https://irdai.gov.in/health-insurance-products>). These are public regulatory
-filings.
+Nine health-insurance policy wordings from nine Indian insurers (SBI General, HDFC ERGO, Future Generali ×2, United India, Bajaj Allianz, Care Health, Aditya Birla, Kotak General), sourced from [IRDAI's public repository](https://irdai.gov.in/health-insurance-products) of filed product documents.
 
-Nine insurers covering the same concepts — waiting periods, pre-existing
-disease, sub-limits, exclusions, cashless claims — with different terms and
-figures. That overlap is deliberate: naive keyword matching retrieves the wrong
-insurer's clause, so the corpus actually exercises retrieval quality.
+The insurers overlap deliberately — all cover waiting periods, exclusions, sub-limits, and cashless claims, but with different terms and figures. That overlap means naive keyword matching retrieves the wrong insurer's clause, so the corpus genuinely exercises retrieval quality.
 
-## Pipeline
+---
 
-1. **Extract** — per-page text via pypdf, preserving page numbers for citation
-2. **Clean** — headers and footers removed by frequency analysis (lines appearing on ≥60% of pages), page-number artifacts stripped
-3. **Chunk** — recursive character splitting, 800 chars with 120-char overlap
-4. **Embed** — *(planned, Phase 2)*
-5. **Retrieve and rerank** — *(planned, Phase 3)*
-6. **Generate with citations** — *(planned, Phase 4)*
+## Run it locally
 
-### Chunking rationale
-
-800 characters is set by the embedding model, not by preference.
-`all-MiniLM-L6-v2` truncates input at 256 tokens and discards the remainder
-**silently** — no error is raised. At roughly 4 characters per token, 800 chars
-lands near 200 tokens, leaving headroom for token-dense legal text. A larger
-chunk size would drop more than half of each chunk before it was ever embedded.
-
-Secondarily, policy clauses run 100–500 characters, so 800 fits a complete
-clause plus its qualifying conditions. The 120-char overlap (~15%) keeps a
-clause intact in at least one chunk when it straddles a boundary.
-
-Chunking is done **per page rather than per document**. This keeps page numbers
-exact, at the cost of splitting clauses that span a page break. Citation
-precision was prioritised over clause continuity, since a user verifying an
-answer needs to know which page to open.
-
-Boilerplate is detected by frequency rather than a hardcoded blocklist — nine
-insurers use nine different footer formats, so a static list would not
-generalise.
-
-**Current corpus stats:** 9 documents → ~1,800 chunks, median 686 characters.
-
-## Known limitations
-
-- **Extraction artifacts.** pypdf introduces intra-word spacing errors
-  (`c alculating`, `forwar d`) in ~15% of chunks, affecting well under 1% of
-  words. pdfplumber was evaluated as an alternative and rejected: 3–5× slower
-  extraction for artifacts of a different kind rather than fewer. Revisit if
-  Phase 8 retrieval evaluation shows measurable degradation.
-- **Page-boundary splits.** A clause spanning two pages is split across two
-  chunks. Accepted as a consequence of per-page chunking (see above).
-- **Scanned documents unsupported.** No OCR stage; the corpus was verified to
-  be digitally generated text.
-  Table-structured content (benefit grids, plan comparison matrices) flattens into low-quality chunks during extraction and occasionally scores well on reranking despite carrying little meaning. Known limitation of linear PDF text extraction; table-aware parsing not in scope.
-
-## Setup
+**Backend**
 
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # macOS/Linux
+venv\Scripts\activate           # Windows  (source venv/bin/activate on macOS/Linux)
 pip install -r requirements.txt
 
-cp .env.example .env           # then add your API key
+cp .env.example .env            # add a GROQ_API_KEY (free at console.groq.com)
 python scripts/download_corpus.py
-python -m app.ingestion        # verify: ~1,800 chunks
+python -m scripts.build_index   # ingest + embed + build FAISS index
+
+uvicorn app.main:app --reload --port 8000
 ```
 
-Requires a Gemini API key (free tier, <https://aistudio.google.com>). A Groq
-key is optional and used as a fallback provider.
+API docs at `http://127.0.0.1:8000/docs`.
 
-All commands run from `backend/` with the virtualenv active.
+**Frontend**
 
-## Status
+```bash
+cd frontend
+npm install
+npm run dev                     # http://localhost:5173
+```
 
-- [x] **Phase 0** — Scaffold, config, corpus acquisition
-- [x] **Phase 1** — Ingestion, cleaning, chunking
-- [ ] **Phase 2** — Embeddings and FAISS index
-- [ ] **Phase 3** — Retrieval with cross-encoder reranking
-- [ ] **Phase 4** — Citation-grounded generation
-- [ ] **Phase 5** — FastAPI service
-- [ ] **Phase 6** — React frontend
-- [ ] **Phase 7** — Containerisation
-- [ ] **Phase 8** — Retrieval and faithfulness evaluation
-- [ ] **Phase 9** — Deployment
+**With Docker**
 
-## Architecture
+```bash
+docker compose up --build
+```
 
-*To be documented once the retrieval pipeline is complete (Phase 3).*
+---
 
-## Evaluation
+## Project structure
 
-*To be documented (Phase 8). Planned metrics: retrieval hit rate, answer
-faithfulness, answer relevance.*
+```
+evidex/
+├── backend/
+│   ├── app/
+│   │   ├── ingestion.py      PDF → cleaned, page-tagged chunks
+│   │   ├── embeddings.py     local sentence-transformer encoder
+│   │   ├── vectorstore.py    FAISS index + metadata sidecar
+│   │   ├── retrieval.py      two-stage retrieve + rerank
+│   │   ├── generation.py     grounded prompt, citation validation
+│   │   ├── llm.py            provider chain with fallback
+│   │   └── main.py           FastAPI service
+│   ├── evals/                gold set + evaluation harness
+│   └── Dockerfile
+├── frontend/                 React + Vite UI
+└── docker-compose.yml
+```
+
+---
+
+## Known limitations
+
+- **Table extraction.** Benefit grids and plan-comparison tables flatten into low-quality text during linear PDF extraction. Table-aware parsing is out of scope; noted where it affects retrieval.
+- **Faithfulness metric.** Scored by substring match — cheap and lexical. An LLM-as-judge approach would catch semantic drift a substring check misses.
+- **Adjacent-chunk duplication.** Neighbouring chunks from the same page occasionally both surface, spending two of five source slots on near-identical text. A page-level dedup step is the planned fix.
+
+---
+
+## What I'd build next
+
+Retrieval hit-rate @5 is the clearest target: the @10 result shows the right clauses are already being found, so the win is in reranking. Candidate improvements — query expansion for short jargon queries, a stronger cross-encoder, and adjacent-chunk deduplication — would be validated against the existing eval harness rather than by eye.
