@@ -7,8 +7,8 @@ Evidex is a retrieval-augmented question-answering system over health-insurance 
 The design premise: **an answer is only as trustworthy as the source behind it.** Every claim is traceable, and hallucination is controlled at three layers, not just the prompt.
 
 <p align="center">
-  <img src="D:\Users\STORAGE\Documents\docsqa\Screenshot 2026-07-25 114955.png" width="49%" alt="Evidex light mode" />
-  <img src="D:\Users\STORAGE\Documents\docsqa\Screenshot 2026-07-25 115307.png" width="49%" alt="Evidex dark mode" />
+  <img src="docs/screenshot-light.png" width="49%" alt="Evidex light mode" />
+  <img src="docs/screenshot-dark.png" width="49%" alt="Evidex dark mode" />
 </p>
 
 ---
